@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+LOG_FILE="${LOG_FILE:-/var/log/monitoring.log}"
+FAILURE_THRESHOLD="${FAILURE_THRESHOLD:-3}"
+PERIOD_SECONDS="${PERIOD_SECONDS:-5}"
+TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-3}"
+
+# initially we set the status to "down"
+failure_count="$((FAILURE_THRESHOLD + 1))"
+
+status() {
+    if [[ "$failure_count" -gt 3 ]]; then
+        echo "down"
+        return
+    fi
+    echo "up"
+}
+
+log() {
+    local msg="$*"
+    local status="$(status)"
+    echo "time=$(date) status=$status msg=$msg" | tee -a $LOG_FILE
+}
+
+monitor() {
+    local url="$1"
+    while true; do
+        local http_code="$(curl -sko /dev/null \
+            -w "%{http_code}" \
+            --connect-timeout "$TIMEOUT_SECONDS" \
+            "$url"
+        )"
+
+        local msg="$http_code"
+
+        # if the http status code is 200 then reset failed count, otherwise
+        # increment it by one.
+        if [[ "$http_code" -ne 200 ]]; then
+            failure_count="$((failure_count + 1))"
+        else
+            failure_count=0
+        fi
+
+        # http status code 000 implies a connection timeout
+        if [[ "$http_code" -eq 000 ]]; then
+            msg="connection timed out"
+        fi
+
+        log "$msg"
+        sleep "$PERIOD_SECONDS"
+    done
+}
+
+# check if necessary binaries are in PATH
+prerequisites=(
+    date
+    tee
+    curl
+)
+
+proceed=true
+for bin in "${prerequisites[@]}"; do
+    if [[ -z "$(command -v "$bin")" ]]; then
+        echo "$bin not found on the system"
+        proceed=false
+    fi
+done
+if [[ "$proceed" != true ]]; then
+    exit 1
+fi
+
+url="$1"
+if [[ -z "$url" ]]; then
+    echo "Usage: $0 URL"
+    exit 1
+fi
+
+monitor "$url"
