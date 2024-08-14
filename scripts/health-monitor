@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+
+# thresholds
+CPU_USED_THRESHOLD=80
+MEM_USED_THRESHOLD=80
+DISK_USED_THRESHOLD=80
+PROCESS_COUNT_THRESHOLD=600
+
+MOUNT_POINT="/"
+LOG_FILE="/tmp/health.log"
+CHECK_INTERVAL="10s"
+
+log() {
+    local msg="$*"
+    echo "time=$(date) type=ALERT msg=$msg" | tee -a $LOG_FILE
+}
+
+check_cpu_usage() {
+    cpu_idle="$(top -b -n 1 | grep -m 1 -oE "[0-9]+.?[0-9]* id,")"
+    cpu_idle="${cpu_idle%% *}"
+    # drop decimal point since bash doesn't support float arithmetic
+    cpu_idle="${cpu_idle%.*}"
+    cpu_used="$(( 100 - cpu_idle ))"
+    if [[ "$cpu_used" -gt "CPU_USED_THRESHOLD" ]]; then
+        log "cpu usage exceeded ${CPU_USED_THRESHOLD}%: ${cpu_used}%"
+    fi
+}
+
+check_mem_usage() {
+    mem_used="$(free | grep '^Mem' | awk '{print $3/$2 * 100.0}')"
+    # drop decimal point since bash doesn't support float comparison.
+    mem_used="${mem_used%.*}"
+    if [[ "$mem_used" -gt "$MEM_USED_THRESHOLD" ]]; then
+        log "memory usage exceeded ${MEM_USED_THRESHOLD}%: ${mem_used}%"
+    fi
+}
+
+check_disk_usage() {
+    disk_used="$(df "$MOUNT_POINT" | awk '{ print $5 }' | sed -n 2p)"
+    disk_used=${disk_used%%%} # trim trailing '%'
+    if [[ "$disk_used" -gt "$DISK_USED_THRESHOLD" ]]; then
+        log "disk usage exceeded ${DISK_USED_THRESHOLD}%: ${disk_used}%"
+    fi
+}
+
+check_process_count() {
+    count="$(ps aux | wc -l)"
+    if [[ "$count" -gt "$PROCESS_COUNT_THRESHOLD" ]]; then
+        log "process count exceeded $PROCESS_COUNT_THRESHOLD: $count"
+    fi
+}
+
+# check if necessary binaries are in PATH
+prerequisites=(
+    top
+    grep
+    free
+    awk
+    df
+    sed
+    ps
+)
+
+proceed=true
+for bin in "${prerequisites[@]}"; do
+    if [[ -z "$(command -v "$bin")" ]]; then
+        echo "$bin not found on the system"
+        proceed=false
+    fi
+done
+if [[ "$proceed" != true ]]; then
+    exit 1
+fi
+
+while true; do
+    check_cpu_usage
+    check_mem_usage
+    check_disk_usage
+    check_process_count
+    sleep "$CHECK_INTERVAL"
+done
