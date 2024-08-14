@@ -5,8 +5,6 @@
 # Eg: backup every hour
 # */60 * * * * /path/to/backup2s3
 
-SRC_DIR="${SRC_DIR:-/path/to/source/directory}"
-S3_BUCKET="${S3_BUCKET:-s3://your-s3-bucket-name}"
 LOG_FILE="${LOG_FILE:-/var/log/backup.log}"
 
 # isosec id to provide context to logs
@@ -19,7 +17,8 @@ log() {
 }
 
 compress() {
-    tar -czf "/tmp/$id.tar.gz" --absolute-names "$SRC_DIR"
+    local source="$1"
+    tar -czf "/tmp/$id.tar.gz" --absolute-names "$source"
     if [[ $? -ne 0 ]]; then
         log "error" "failed to compress directory"
         exit 1
@@ -27,8 +26,9 @@ compress() {
 }
 
 upload() {
+    local bucket="$1"
     # send output to /dev/null, but not errors
-    aws s3 cp --no-progress "/tmp/$id.tar.gz" "$S3_BUCKET/" >/dev/null
+    aws s3 cp --no-progress "/tmp/$id.tar.gz" "$bucket/" >/dev/null
     if [[ $? -ne 0 ]]; then
         log "error" "failed to upload backup to s3"
         exit 1
@@ -58,7 +58,20 @@ if [[ "$proceed" != true ]]; then
     exit 1
 fi
 
-compress
-upload
+source="$SRC_DIR"
+bucket="$S3_BUCKET"
+
+if [[ -z "$source" ]]; then
+    echo "SRC_DIR environment variable not set. Eg: SRC_DIR=/var/lib/mydata.db"
+    exit 1
+fi
+
+if [[ -z "$bucket" ]]; then
+    echo "S3_BUCKET environment variable not set. Eg: S3_BUCKET=s3://your-s3-bucket-name/backups"
+    exit 1
+fi
+
+compress "$source"
+upload "$bucket"
 clean
-log "success" "uploaded backup of $SRC_DIR to s3 bucket $S3_BUCKET"
+log "success" "uploaded backup of $source to s3 bucket $bucket"
