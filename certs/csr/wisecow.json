@@ -1,0 +1,18 @@
+{
+  "CN": "wisecow",
+  "key": {
+    "algo": "rsa",
+    "size": 4096
+  },
+  "names": [
+    {
+      "C": "IN",
+      "L": "Mumbai",
+      "O": "MyOrg",
+      "OU": "Wisecow Team"
+    }
+  ],
+  "hosts": [
+    "wisecow.murtazau.xyz"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "CN": "CA",
+  "key": {
+    "algo": "rsa",
+    "size": 4096
+  },
+  "names": [
+    {
+      "C": "IN",
+      "L": "Mumbai",
+      "O": "MyOrg",
+      "OU": "DevOps"
+    }
+  ],
+  "ca": {
+    "expiry": "2160h"
+  }
+}
