@@ -66,3 +66,132 @@ consists of three jobs that perform the following tasks:
 2. Run an end-to-end test using Kind.
 3. If the above two succeed, deploy the manifests to the Kubernetes
    cluster running in my K3S lab.
+
+## Problem statement 2 - Writing bash scripts
+
+Each script has parameters that can be configured using environment
+variables. All scripts have dependency checks built-in. The scripts will
+error out in case any of the required dependencies are missing.
+
+1. [x] System Health Monitoring Script
+
+Solution: [script](./scripts/health-monitor)
+
+| Environment variable                                 | Default value       |
+|------------------------------------------------------|---------------------|
+| CPU_USED_THRESHOLD                                   | 80 (in percent)     |
+| MEM_USED_THRESHOLD                                   | 80 (in percent)     |
+| DISK_USED_THRESHOLD                                  | 80 (in percent)     |
+| PROCESS_COUNT_THRESHOLD                              | 600                 |
+| MOUNT_POINT (where disk usage needs to be monitored) | /                   |
+| LOG_FILE                                             | /var/log/health.log |
+| CHECK_INTERVAL                                       | 10s                 |
+
+```
+$ LOG_FILE=/tmp/foo.log PROCESS_COUNT_THRESHOLD=10 ./scripts/health-monitor
+time=Wed Aug 14 09:24:08 PM IST 2024 type=ALERT msg=process count exceeded 10: 272
+```
+
+2. [x] Automated Backup Solution
+
+Solution: [script](./scripts/backup2s3)
+
+This script used the aws-cli tool to upload backups to s3. It gzips the
+source directory before uploading. A cronjob can be setup to automate
+backups at regular interval.
+
+Eg: Backup every hour
+
+```
+*/60 * * * * /path/to/backup2s3
+```
+
+| Environment variable | Default value                                  |
+|----------------------|------------------------------------------------|
+| SRC_DIR              | REQUIRED. Eg: /var/lib/mydata.db               |
+| S3_BUCKET            | REQUIRED. Eg: s3://your-s3-bucket-name/backups |
+| LOG_FILE             | /var/log/backup.log                            |
+
+```
+$ LOG_FILE=/tmp/foo.log SRC_DIR=/tmp/test/foo S3_BUCKET=s3://mypublicassetstore/backups ./scripts/backup2s3
+time=Wed Aug 14 09:39:27 PM IST 2024 id=20240814160915 type=success msg=uploaded backup of /tmp/test/foo to s3 bucket s3://mypublicassetstore/backups
+```
+
+**NOTE**: AWS credentials must be configured (`aws configure`) in order
+for the script to work.
+
+3. [x] Log File Analyzer
+
+Solution: [script](./scripts/analyse-nginx-log)
+
+This script parses nginx log file (default format) and summarizes the
+statistics mentioned in the problem statement. I've provided a sample
+log file [here](./data/access.log).
+
+| Environment variable | Default value                                      |
+|----------------------|----------------------------------------------------|
+| LOG_FILE             | /var/log/nginx/access.log (path to nginx log file) |
+
+```
+$ LOG_FILE=./data/access.log ./scripts/analyse-nginx-log
+Summary of http status code:
+     22 200
+     23 301
+     14 302
+     22 404
+     19 500
+Top 10 most requested pages:
+     23 /contact.html
+     20 /about.html
+     19 /products.html
+     14 /services.html
+     12 /index.html
+     12 /blog.html
+Top 10 ip address with the most requests:
+     20 10.0.0.1
+     26 10.0.0.2
+     12 172.16.0.1
+     11 192.168.0.1
+     14 192.168.0.2
+     17 192.168.0.3
+Top 10 user-agents with the most request:
+      9 curl/7.68.0
+     15 Mozilla/5.0
+     35 Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)
+     23 Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+     18 PostmanRuntime/7.26.8
+```
+
+4. [x] Application Health Checker
+
+Solution: [script](./scripts/monitor-web-server)
+
+This script probes a web server url at regular intervals. The parameters
+are similar to Kubernetes' health probes.
+
+| Environment variable | Default value           |
+|----------------------|-------------------------|
+| LOG_FILE             | /var/log/monitoring.log |
+| FAILURE_THRESHOLD    | 3                       |
+| PERIOD_SECONDS       | 5                       |
+| TIMEOUT_SECONDS      | 3                       |
+
+```
+wisecow:main[!](shell)$ LOG_FILE=/tmp/foo.log ./scripts/monitor-web-server https://wisecow.murtazau.xyz
+time=Wed Aug 14 09:46:57 PM IST 2024 status=up msg=200
+time=Wed Aug 14 09:47:02 PM IST 2024 status=up msg=200
+time=Wed Aug 14 09:47:07 PM IST 2024 status=up msg=200
+```
+
+```
+wisecow:main[!](shell)$ LOG_FILE=/tmp/foo.log ./scripts/monitor-web-server https://foolcow.murtazau.xyz
+time=Wed Aug 14 09:47:22 PM IST 2024 status=down msg=404
+time=Wed Aug 14 09:47:27 PM IST 2024 status=down msg=404
+```
+
+```
+wisecow:main[!](shell)$ LOG_FILE=/tmp/foo.log ./scripts/monitor-web-server http://timeout.foo
+time=Wed Aug 14 09:47:56 PM IST 2024 status=down msg=connection timed out
+time=Wed Aug 14 09:48:01 PM IST 2024 status=down msg=connection timed out
+time=Wed Aug 14 09:48:06 PM IST 2024 status=down msg=connection timed out
+```
