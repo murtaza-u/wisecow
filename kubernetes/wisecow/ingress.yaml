@@ -18,6 +18,7 @@ metadata:
   name: wisecow-ingress
   namespace: accuknox
 spec:
+  ingressClassName: traefik
   tls:
   - hosts:
       - wisecow.murtazau.xyz

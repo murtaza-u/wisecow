@@ -3,3 +3,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: accuknox
+  labels:
+    # I'm running fluxCD in my homelab cluster. The following label prevents
+    # flux from pruning untracked resources.
+    kustomize.toolkit.fluxcd.io/prune: disabled
