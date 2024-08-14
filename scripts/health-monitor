@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 
+# exit immediately on error
+set -e
+
 # thresholds
 CPU_USED_THRESHOLD=${CPU_USED_THRESHOLD:-80}
 MEM_USED_THRESHOLD=${MEM_USED_THRESHOLD:-80}
 DISK_USED_THRESHOLD=${DISK_USED_THRESHOLD:-80}
 PROCESS_COUNT_THRESHOLD=${PROCESS_COUNT_THRESHOLD:-600}
 
-MOUNT_POINT="/"
-LOG_FILE="/tmp/health.log"
-CHECK_INTERVAL="10s"
+MOUNT_POINT="${MOUNT_POINT:-/}"
+LOG_FILE="${LOG_FILE:-/var/log/health.log}"
+CHECK_INTERVAL="${CHECK_INTERVAL:-10s}"
 
 log() {
     local msg="$*"

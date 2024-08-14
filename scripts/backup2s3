@@ -7,7 +7,7 @@
 
 SRC_DIR="${SRC_DIR:-/path/to/source/directory}"
 S3_BUCKET="${S3_BUCKET:-s3://your-s3-bucket-name}"
-LOG_FILE="${LOG_FILE:-/tmp/backup.log}"
+LOG_FILE="${LOG_FILE:-/var/log/backup.log}"
 
 # isosec id to provide context to logs
 id="$(date -u +%Y%m%d%H%M%S)"
