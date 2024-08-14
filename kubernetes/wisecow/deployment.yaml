@@ -1,0 +1,62 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wisecow
+  namespace: accuknox
+  labels:
+    app: wisecow
+spec:
+  selector:
+    matchLabels:
+      app: wisecow
+  replicas: 3
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: wisecow
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: wisecow
+          image: murtazau/wisecow:v0.1.0
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 50m
+              memory: 20Mi
+            limits:
+              cpu: 200m
+              memory: 50Mi
+          readinessProbe:
+            httpGet: &endpoint
+              path: /
+              port: 4499
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: *endpoint
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 7
+            periodSeconds: 15
+          ports:
+            - containerPort: 4499
+              name: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+      restartPolicy: Always
