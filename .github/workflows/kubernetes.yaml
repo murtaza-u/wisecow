@@ -3,7 +3,11 @@ name: Kubernetes CI/CD
 
 on:
   pull_request:
+    paths:
+      - "kubernetes/**"
   push:
+    paths:
+      - "kubernetes/**"
     branches:
       - "*"
     tags:
