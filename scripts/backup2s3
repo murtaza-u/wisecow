@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+
+# Use cronjob to run periodically.
+#
+# Eg: backup every hour
+# */60 * * * * /path/to/backup2s3
+
+SRC_DIR="${SRC_DIR:-/path/to/source/directory}"
+S3_BUCKET="${S3_BUCKET:-s3://your-s3-bucket-name}"
+LOG_FILE="${LOG_FILE:-/tmp/backup.log}"
+
+# isosec id to provide context to logs
+id="$(date -u +%Y%m%d%H%M%S)"
+
+log() {
+    local status="$1"; shift
+    local msg="$*"
+    echo "time=$(date) id=$id type=$status msg=$msg" | tee -a "$LOG_FILE"
+}
+
+compress() {
+    tar -czf "/tmp/$id.tar.gz" --absolute-names "$SRC_DIR"
+    if [[ $? -ne 0 ]]; then
+        log "error" "failed to compress directory"
+        exit 1
+    fi
+}
+
+upload() {
+    # send output to /dev/null, but not errors
+    aws s3 cp --no-progress "/tmp/$id.tar.gz" "$S3_BUCKET/" >/dev/null
+    if [[ $? -ne 0 ]]; then
+        log "error" "failed to upload backup to s3"
+        exit 1
+    fi
+}
+
+clean() {
+    rm -f "/tmp/$id.tar.gz"
+}
+
+# check if necessary binaries are in PATH
+prerequisites=(
+    date
+    tee
+    tar
+    aws
+)
+
+proceed=true
+for bin in "${prerequisites[@]}"; do
+    if [[ -z "$(command -v "$bin")" ]]; then
+        echo "$bin not found on the system"
+        proceed=false
+    fi
+done
+if [[ "$proceed" != true ]]; then
+    exit 1
+fi
+
+compress
+upload
+clean
+log "success" "uploaded backup of $SRC_DIR to s3 bucket $S3_BUCKET"
