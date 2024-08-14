@@ -1,0 +1,61 @@
+---
+name: Kubernetes CI/CD
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "*"
+    tags:
+      - "*"
+
+jobs:
+  validation-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup kubeconform
+        uses: fluxcd/pkg/actions/kubeconform@main
+
+      - name: Validate schema
+        run: |
+          while IFS= read -r -d $'\n' file; do
+            kubeconform \
+              --strict \
+              --ignore-missing-schemas \
+              --schema-location default \
+              --verbose \
+              "$file"
+          done < <(find ./kubernetes -type f -name '*.yaml' -o -name "*.yml")
+  e2e-test:
+    needs: validation-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Kubernetes
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: kind
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -f ./kubernetes/namespace.yaml
+          kubectl apply -f ./kubernetes/wisecow
+
+      - name: Verify if pods are ready
+        run: |
+          kubectl wait pod -l app=wisecow \
+            --for=condition=ready \
+            --timeout=5m \
+            -n accuknox
+
+      - name: Debug failure
+        if: failure()
+        run: |
+          kubectl -n accuknox get all
+          kubectl -n accuknox describe pod -l app=wisecow
+          kubectl -n accuknox logs deployments/wisecow
